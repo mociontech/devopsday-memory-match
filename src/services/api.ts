@@ -19,6 +19,8 @@ export interface Persona {
 export interface PersonaConsultada extends Persona {
   /** Ya terminó una partida de Memory Match: no puede repetir. */
   jugado: boolean;
+  /** Contacto guardado (solo si aún no completó esta experiencia): sirve para registrarla en Evius. */
+  contacto?: { correo?: string; celular?: string; empresa?: string };
 }
 
 export interface DatosRegistro {
@@ -90,10 +92,11 @@ export const Registros = {
 
   async buscarPorId(id: string): Promise<PersonaConsultada | null> {
     try {
-      const r = await pedir<{ id: string; nombre: string; jugado?: boolean }>(
+      const r = await pedir<{ id: string; nombre: string; jugado?: boolean; correo?: string; celular?: string; empresa?: string }>(
         `/participante/${encodeURIComponent(id)}?experiencia=${EXPERIENCE}`,
       );
-      return { id: r.id, nombre: r.nombre, jugado: r.jugado === true };
+      const contacto = r.correo ? { correo: r.correo, celular: r.celular, empresa: r.empresa } : undefined;
+      return { id: r.id, nombre: r.nombre, jugado: r.jugado === true, contacto };
     } catch (e) {
       if (e instanceof ErrorApi && e.codigo === "no_encontrado") return null;
       throw e;

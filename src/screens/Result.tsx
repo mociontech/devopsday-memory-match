@@ -30,8 +30,7 @@ export function Result() {
       puntaje: toDbScore(result.score),
       detalles: { intentos: result.attempts, duracionMs: result.durationMs, parejas: PAIRS_COUNT },
     });
-    // A Evius, en paralelo y en segundo plano. Solo si la persona se registró en este equipo: el acceso rápido por ID
-    // no devuelve el correo, así que ahí no hay con qué identificarla en Evius.
+    // A Evius, en paralelo y en segundo plano. El contacto viene del registro (o se rescató de la base al entrar con ID).
     const contacto = contactoDe(session.id);
     if (contacto) {
       enviarEvius(contacto, { score: toDbScore(result.score), attempts: result.attempts, durationMs: result.durationMs });

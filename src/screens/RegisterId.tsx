@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { IdInput, type IdInputValue } from "../components/IdInput";
 import { Warning } from "../components/Popup";
 import { img } from "../assets";
+import { registrarContactoEnEvius } from "../services/evius";
 import { Registros, mensajeDe } from "../services/api";
 
 const EMPTY_ID: IdInputValue = ["", ""];
@@ -43,6 +44,9 @@ export function RegisterId() {
         setAviso("Parece que ya participaste en esta experiencia. ¡Gracias!");
         return;
       }
+      // La persona ya estaba registrada: se rescata su contacto de la base para mandarla a Evius.
+      // La partida se envía a Evius al terminar (Result), con su puntaje.
+      registrarContactoEnEvius(persona.id, persona.nombre, persona.contacto);
       setSession({ id: persona.id, name: persona.nombre });
       navigate("instructions");
     } catch (err) {

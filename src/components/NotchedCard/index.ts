@@ -1,1 +1,0 @@
-export { NotchedCard } from "./NotchedCard";

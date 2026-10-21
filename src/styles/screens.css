@@ -1,0 +1,594 @@
+/*
+ * Estilos de las pantallas (diseño Figma "VERTICAL", lienzo de 1080×1920).
+ * Todo se posiciona con las coordenadas exactas del diseño; el escenario completo se escala a la pantalla.
+ */
+
+#root {
+  position: relative;
+}
+
+.stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1080px;
+  height: 1920px;
+  transform: translate(-50%, -50%) scale(var(--s, 1));
+  transform-origin: center;
+  overflow: hidden;
+  background: var(--color-paper);
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.screen--pink {
+  background: var(--color-pink);
+}
+
+.abs {
+  position: absolute;
+  display: block;
+  max-width: none;
+}
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Imagen centrada en su caja y girada (--r), como la deja Figma. */
+.art > img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  transform: translate(-50%, -50%) rotate(var(--r, 0deg));
+}
+
+.soft-bg {
+  position: absolute;
+  left: 0;
+  top: 203px;
+  width: 3986px;
+  height: 1920px;
+  max-width: none;
+  opacity: 0.33;
+  transform: rotate(180deg);
+  pointer-events: none;
+}
+
+/* Brillo cian: el modo `difference` sobre el fondo claro lo produce. Debe quedar fuera de cualquier contenedor transformado. */
+.diamond {
+  mix-blend-mode: difference;
+}
+
+/* ---------- Marca ---------- */
+.brand {
+  position: absolute;
+}
+.brand__rule {
+  position: absolute;
+  width: 2px;
+  background: #000;
+}
+.brand__rule--light {
+  background: #fff;
+}
+
+.social {
+  position: absolute;
+  width: 540px;
+  height: 36px;
+}
+.social img {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.social__link {
+  position: absolute;
+  left: 228px;
+  top: 0;
+  width: 280px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-link);
+  font-size: 39px;
+  line-height: 56px;
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+/* ---------- Tipografía ---------- */
+.title {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: normal;
+  color: var(--color-ink);
+}
+.title--111 {
+  font-size: 111px;
+}
+.title--97 {
+  font-size: 97px;
+}
+.title--ink {
+  font-weight: 700;
+  color: var(--color-body);
+}
+
+.hero-word {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  font-family: var(--font-hero);
+  font-weight: 800;
+  font-size: 165.557px;
+  line-height: 133.9px;
+  color: var(--color-ink);
+  pointer-events: none;
+}
+
+.tagline {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-hero);
+  font-weight: 800;
+  font-size: 81px;
+  line-height: 70px;
+  color: var(--color-ink);
+}
+.subtagline {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-link);
+  font-size: 46px;
+  line-height: 56px;
+  color: var(--color-ink);
+}
+
+.lead {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 48.75px;
+  color: var(--color-body);
+}
+.lead strong {
+  font-weight: 700;
+  line-height: 73px;
+}
+.lead span {
+  font-weight: 400;
+}
+.lead--id span {
+  line-height: 58px;
+}
+.lead--instructivo {
+  font-weight: 400;
+  line-height: 73px;
+}
+
+/* ---------- Botones ---------- */
+.btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: transform 0.12s ease;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.btn--dark {
+  background: var(--color-ink);
+  color: #fff;
+  border-radius: 66.5px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 65px;
+}
+.btn--pink {
+  background: var(--color-pink);
+  color: #fff;
+  border-radius: 24px;
+  font-family: var(--font-hero);
+  font-weight: 700;
+  font-size: 50px;
+}
+.btn:focus-visible,
+.link-btn:focus-visible,
+.back:focus-visible,
+.card:focus-visible {
+  outline: 4px solid #00d7d7;
+  outline-offset: 6px;
+}
+
+.link-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-code);
+  font-weight: 400;
+  font-size: 54px;
+  color: var(--color-code);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.back {
+  position: absolute;
+  width: 133px;
+  height: 84.5px;
+  padding: 0;
+}
+.back img {
+  width: 100%;
+  height: 100%;
+  transform: rotate(180deg);
+}
+
+/* ---------- Campos del registro ---------- */
+.field {
+  position: absolute;
+  display: block;
+  width: 882px;
+  height: 99px;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 24px;
+  background: var(--color-input-bg);
+  transition: box-shadow 0.12s ease;
+}
+.field:focus-within {
+  box-shadow: 0 0 0 4px rgba(0, 215, 215, 0.55);
+}
+.field.is-invalid {
+  border-color: var(--color-error);
+}
+.field__icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 114px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.field__icon img {
+  max-width: 62px;
+  max-height: 64px;
+}
+.field__dot {
+  position: absolute;
+  left: 115px;
+  top: 43.5px;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.field input {
+  width: 100%;
+  height: 100%;
+  padding: 0 24px 0 143px;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-code);
+  font-weight: 400;
+  font-size: 50px;
+  color: var(--color-code);
+}
+.field input::placeholder {
+  color: var(--color-code);
+  opacity: 0.4;
+}
+
+.form-error {
+  position: absolute;
+  height: 44px;
+  font-family: var(--font-body);
+  font-size: 30px;
+  line-height: 44px;
+  color: var(--color-error);
+  text-align: center;
+}
+.form-error--center {
+  text-align: center;
+}
+
+/* ---------- ID (321-321) ---------- */
+.id-code {
+  position: absolute;
+  left: 177px;
+  width: 704px;
+  display: flex;
+  align-items: center;
+}
+.id-box {
+  width: 320px;
+  height: 154px;
+  flex: none;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 24px;
+  background: var(--color-input-bg);
+  text-align: center;
+  font-family: var(--font-code);
+  font-weight: 700;
+  font-size: 95px;
+  line-height: 150px;
+  color: var(--color-code);
+  outline: none;
+  display: block;
+  padding: 0;
+}
+.id-box::placeholder {
+  color: var(--color-code);
+  opacity: 0.4;
+}
+.id-box:focus {
+  box-shadow: 0 0 0 4px rgba(0, 215, 215, 0.55);
+}
+.id-box.is-invalid {
+  border-color: var(--color-error);
+}
+.id-box--value {
+  letter-spacing: 0.04em;
+}
+.id-dash {
+  width: 64px;
+  flex: none;
+  text-align: center;
+  font-family: var(--font-code);
+  font-weight: 700;
+  font-size: 95px;
+  color: var(--color-code);
+  opacity: 0.4;
+}
+
+/* ---------- Avisos ---------- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: var(--color-overlay);
+}
+.warning {
+  position: absolute;
+  left: 201px;
+  top: 877px;
+  width: 690px;
+  min-height: 307px;
+  padding: 56px 79px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 70px;
+  background: var(--color-pink);
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 48.75px;
+  line-height: 55px;
+  color: #fff;
+}
+.warning strong {
+  font-weight: 700;
+}
+
+.match-popup-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+}
+.match-popup {
+  position: absolute;
+  left: 201px;
+  top: 853px;
+  width: 690px;
+  height: 355px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 9px solid #fff;
+  border-radius: 70px;
+  background: var(--color-pink);
+  text-align: center;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 48.75px;
+  line-height: normal;
+  color: #fff;
+}
+.match-popup p {
+  width: 532px;
+}
+
+/* ---------- Juego ---------- */
+.attempts {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 66.5px;
+  background: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 65px;
+  color: #fff;
+}
+.attempts--pink {
+  background: var(--color-pink);
+}
+
+.board {
+  position: absolute;
+  display: grid;
+  grid-template-columns: repeat(3, 210px);
+  grid-template-rows: repeat(4, 200px);
+  column-gap: 52.5px;
+  row-gap: 32px;
+}
+
+.card {
+  display: block;
+  width: 210px;
+  height: 200px;
+  perspective: 800px;
+  animation: cardDrop 500ms cubic-bezier(0.34, 1.15, 0.64, 1) both;
+  animation-delay: var(--drop-delay, 0ms);
+}
+
+@keyframes cardDrop {
+  from {
+    transform: translateY(-160%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/*
+ * "Respiración" mientras una carta boca abajo espera un toque: sin movimiento el tablero se ve muerto. Corre en
+ * `.card` (no en `.card__inner`, que es el dueño del giro) para no pelear con la transición del volteo.
+ */
+.card--breathing {
+  animation: cardBreathe var(--breathe-duration, 3400ms) ease-in-out var(--breathe-delay, 0ms) infinite;
+}
+
+@keyframes cardBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.045);
+  }
+}
+
+/* Un error recibe una sacudida corta en vez de quedarse quieto durante MISMATCH_DELAY_MS. */
+.card--shaking .card__inner {
+  animation: cardShake 400ms ease-in-out;
+}
+
+@keyframes cardShake {
+  0%,
+  100% {
+    transform: rotateY(180deg) translateX(0);
+  }
+  20% {
+    transform: rotateY(180deg) translateX(-4%);
+  }
+  40% {
+    transform: rotateY(180deg) translateX(4%);
+  }
+  60% {
+    transform: rotateY(180deg) translateX(-3%);
+  }
+  80% {
+    transform: rotateY(180deg) translateX(3%);
+  }
+}
+
+.card__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 400ms ease;
+  transform: rotateY(0deg);
+}
+.card__inner--flipped {
+  transform: rotateY(180deg);
+}
+/* will-change solo mientras corre la transición: dejarlo fijo gastaría memoria en hardware de gama baja. */
+.card__inner[data-animating="true"] {
+  will-change: transform;
+}
+
+.card__face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  border-radius: 23px;
+}
+.card__face img {
+  position: absolute;
+  max-width: none;
+  object-fit: contain;
+}
+.card__face--down {
+  background: var(--color-pink);
+}
+.card__face--up {
+  transform: rotateY(180deg);
+}
+
+/* ---------- Resultado ---------- */
+.result-title {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-hero);
+  font-weight: 800;
+  font-size: 105px;
+  line-height: 99px;
+  color: var(--color-ink);
+}
+.result-time {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-hero);
+  font-weight: 400;
+  font-size: 59px;
+  line-height: 99px;
+  color: var(--color-ink);
+}
+
+/* Sin fondo, sin borde, sin cursor especial: a propósito no da ninguna pista visual de que existe. */
+.secret-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72px;
+  height: 72px;
+  z-index: 9999;
+}

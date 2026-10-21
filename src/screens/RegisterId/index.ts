@@ -1,1 +1,0 @@
-export { RegisterId } from "./RegisterId";

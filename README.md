@@ -1,145 +1,80 @@
-# Kick and Match — Mirage
+# Memory Match — DevOps Days Bogotá 2026
 
-Juego de memoria de marca para tótem táctil vertical de bajas prestaciones.
-React 18 + Vite + TypeScript estricto, sin dependencias de runtime más allá
-de React.
-
-## Requisitos del entorno
-
-- Node 22+
-- `npm install`
-- Copiar `.env.example` a `.env.local` y llenar `VITE_KIOSK_ID`, `VITE_COUNTRY`,
-  las variables `VITE_EVIUS_*` y `VITE_RANKING_DB_*` (ver sección "Pendientes" —
-  hoy están vacías a propósito).
+Juego de memoria para tótem táctil vertical (1080×1920). React + Vite + TypeScript estricto.
+Reemplaza el diseño de Mirage ("Kick and Match"): el código anterior sigue en el historial de git.
 
 ## Scripts
 
 | Comando | Qué hace |
 |---|---|
-| `npm run dev` | Servidor de desarrollo |
+| `npm run dev` | Servidor de desarrollo en http://127.0.0.1:5504 (puerto fijo: coincide con `ALLOWED_ORIGINS` de la API) |
 | `npm run build` | `tsc` (type-check estricto) + build de producción |
 | `npm run preview` | Sirve el build de `dist/` |
-| `npm run test` | Suite de Vitest |
+| `npm run test` | Vitest (puntaje y lógica del tablero) |
 
-## Estado del bundle (presupuesto: <150 KB JS gzip)
-
-Última medición (`npm run build`):
+## Flujo
 
 ```
-dist/assets/index-*.js    165.47 kB │ gzip: 54.97 kB   (65% bajo el presupuesto)
-dist/assets/index-*.css     9.56 kB │ gzip:  2.57 kB
+welcome → register → idGenerated → instructions → game → result → welcome
+              └─ "digitar ID código" → registerId ─┘   (acceso rápido)
 ```
 
-Fuentes autohospedadas (no cuentan contra el presupuesto de JS, pero sí pesan
-en la carga inicial): ~61 KB en 4 archivos `.woff2` (Poppins 400/700/800 +
-Lora variable 400-700), todas subset latino con `font-display: swap`.
+- **Un ID por persona** (`321-321`), generado en el servidor y válido en todas las experiencias del evento.
+  Quien ya se registró en VR, Láser Grafiti o Mega Control entra aquí con ese ID, sin volver a registrarse.
+- **Una partida por persona.** Si el ID ya terminó Memory Match: «Parece que ya participaste en esta experiencia».
+- **Sin ranking en esta app.** El ranking del evento sale de la base de datos (vista `ranking`).
+- Los avisos (correo repetido, ID no encontrado, ya participaste) son un modal sobre la pantalla, como en el diseño.
 
-## Arquitectura
+## Juego
 
-```
-src/
-  app/        FlowMachine (useReducer + Context) — máquina de estados de pantallas
-  screens/    Una carpeta por pantalla + ScreenShell (layout compartido: BrandFrame + Logo + fondo)
-  components/ Design system: Button, TextField, IdInput, Modal, ProductPopup, BrandFrame, Logo, Badge, AttemptsBadge
-  game/       Lógica del juego, sin JSX: useMemoryGame, scoring, shuffle, game.config, products
-  services/   api.ts (único punto de salida) + outbox.ts (patrón outbox) + ranking.ts, idService.ts
-  hooks/      useIdleReset
-  styles/     tokens.css (design tokens), reset.css (kiosk hardening), fonts.css (@font-face)
-  types/      Participation
-```
+- 12 cartas: 6 parejas en un tablero de 3 columnas × 4 filas (`game/game.config.ts`).
+- Sin cuenta regresiva: el tablero solo muestra los **intentos**; al final se muestra el tiempo que tomó la partida.
+- **Puntaje (0-100):** cada pareja suma 100/6; cada error resta 4; mínimo 0. Es el `puntaje` que va a la base.
+  Se redondea a entero (`game/scoring.ts`). _Pendiente de confirmar con quien defina el ranking._
+- Al acertar una pareja aparece un popup con uno de los 12 textos del diseño (`game/popups.ts`), sin repetir en la partida.
 
-### Por qué máquina de estados en vez de router
+## Datos y servidor
 
-El flujo es lineal y cerrado (tótem público): un router expondría URLs
-manipulables y el botón atrás del navegador, ninguno de los dos deseable en
-un kiosco. `FlowMachine` (`useReducer` + `Context`) modela las 8 pantallas
-como estados explícitos; "Advertencia" (ID ya usado) **no** es una pantalla
-sino un modal sobre `RegisterId`, porque el diseño la muestra como overlay
-sin salida hacia el juego, no como destino navegable.
+La base de datos se habla a través de la función de servidor del proyecto (`../backend`). **Evius se envía directo desde
+la app** (`services/evius.ts`), en paralelo y en segundo plano, con las variables `VITE_EVIUS_*`: el token queda en el
+código del navegador. Solo se envía si la persona se registró en este equipo (el acceso rápido no devuelve el correo).
 
-### Patrón outbox (`services/outbox.ts`)
+| Acción | Llamada |
+|---|---|
+| Registro | `POST /registrar` |
+| Acceso rápido | `GET /participante/:id?experiencia=memory` |
+| Resultado de la partida | `POST /participacion` (idempotente: solo cuenta la primera vez) |
 
-Al terminar la partida, `Result.tsx` escribe el resultado en `localStorage`
-(`kam:outbox`) **antes** de que la UI dependa de la red — nunca se bloquea al
-participante. Un flush en background reintenta con backoff 1s/2s/4s/8s (5
-intentos), reintenta también al recuperar el evento `online`, y purga la
-entrada solo tras una respuesta 2xx de **ambos** destinos. Cada envío lleva
-`Idempotency-Key` = ID de participación para que un doble flush no duplique
-registros.
+`services/outbox.ts` guarda el resultado en `localStorage` **antes** de depender de la red y lo reintenta en
+segundo plano (1s/2s/4s/8s, al volver la conexión y cada 20 s), así que nadie queda bloqueado por un mal wifi.
 
-### Capa de servicios detrás de una interfaz
+**Requiere la migración `backend/supabase/migrations/20261021_003_memory_match.sql`** (agrega la experiencia
+`memory`, la marca de "ya jugó" y el guardado del resultado). Sin ella, el registro y el resultado fallan.
 
-`services/api.ts` hace fan-out en cliente a tres destinos por participación:
-Evius `/attendees` (dedupe por email + eventId, se salta si no hay email),
-Evius `/experiences` (con fallback documentado a `/activities` si `/experiences`
-falla) y la tabla compartida `participations` en Supabase (mismo proyecto que
-usa Catálogo, dedupe por `participant_id` + `country` + `experience`). Todo
-gateado por variables de entorno vacías por defecto (ver `.env.example`). El
-resto de la app (outbox, screens) no sabe ni le importa cuántos destinos hay
-detrás — solo conoce `submitParticipation(participation)`.
+## Variables de entorno (`.env`)
 
-### Grid del tablero derivado, no hardcodeado
+Solo `VITE_*` llega al navegador. Ver `.env.example`.
 
-`game.config.ts` deriva las columnas con `Math.floor(Math.sqrt(totalCards))`.
-Esta fórmula reproduce las dos grillas que aparecen en el archivo de Figma
-sin necesidad de un caso especial: 20 cartas → 4×5, 16 → 4×4, 12 → 3×4.
-Cambiar `PAIRS_COUNT` reconfigura el tablero completo sin tocar otro archivo.
+| Variable | Para qué |
+|---|---|
+| `VITE_API_URL` | URL de la función `api`. Tiene valor por defecto en `config/env.ts`. |
+| `VITE_KIOSK_ID` | Identificador del tótem (diagnóstico). |
+| `VITE_EVIUS_URL`, `VITE_EVIUS_TOKEN`, `VITE_EVIUS_EVENT_ID`, `VITE_EVIUS_EXPERIENCE_ID`, `VITE_EVIUS_SOURCE` | Evius (Datahub). Sin ellas el envío a Evius queda apagado. En Netlify, cargarlas como variables del sitio. |
 
-### Animación de cartas
+## Tipografía y recursos
 
-El volteo usa únicamente `transform: rotateY()` + `backface-visibility`
-(`screens/Game/Card.tsx`), nunca propiedades que disparen layout. `will-change`
-se aplica solo mientras la transición corre (vía `data-animating` + el evento
-`onTransitionEnd`), no de forma permanente — con 20 cartas en pantalla,
-hintear el compositor todo el tiempo desperdicia memoria en el hardware de
-gama baja que es el objetivo de este proyecto.
+- Fuentes autohospedadas (`@fontsource`, solo subset latino): el kiosko no llama a Google Fonts en runtime.
+  Figtree sustituye a Proxima Nova (sin licencia).
+- Imágenes en `src/assets/images` (WebP al doble del tamaño en pantalla; el fondo suave viene recortado de Figma).
+- `public/sw.js` guarda imágenes y fuentes en caché (cache-first) para el wifi congestionado del venue.
 
-### Tokens y tipografía
+## Kiosco
 
-`styles/tokens.css` documenta qué colores vienen de Variables reales de Figma
-(`Pantone/Rojo`, `Pag Web/Rojo`, `Pag Web/Gris`, `Blanco`) y cuáles son
-derivados de valores repetidos sin Variable asociada (fondo de página
-`#EFEFEF`, borde de inputs, overlay de modales). Poppins (display/botones) y
-Lora (cuerpo) se autohospedan en `styles/fonts.css`, subset latino, sin
-ninguna llamada a Google Fonts en runtime.
+Gestos bloqueados (menú contextual, zoom), reinicio por inactividad a los 60 s y una zona secreta arriba a la
+derecha (5 toques) para que el staff saque a alguien de una pantalla trabada.
 
-## Pendientes que requieren información del cliente
+## Desviaciones del diseño
 
-Estos NO bloquean el build ni el flujo — todo funciona con datos de relleno
-claramente marcados — pero hace falta contenido real antes de producción:
-
-1. **Catálogo de productos** (`src/game/products.ts`): solo `rt3` tiene copy
-   real ("Con el aire RT3 de mirage la vida es cool"); los otros 9 son
-   placeholders (`Copy pendiente del cliente para Producto N`). Tampoco hay
-   arte de producto real en el archivo de Figma — las cartas boca-arriba usan
-   colores de relleno (`screens/Game/Card.tsx`), no imágenes.
-2. **Frase de marca de Bienvenida**: el propio Figma trae el texto literal
-   "frase inicial de marca" sin reemplazar — se muestra tal cual.
-3. **Credenciales reales**: `.env.example` documenta las variables
-   `VITE_EVIUS_*` y `VITE_RANKING_DB_*`, todas vacías. Mientras no se
-   configuren, `submitParticipation` lanza y el outbox simplemente sigue
-   reintentando (comportamiento seguro, no hay pérdida de datos: quedan en
-   `localStorage`).
-4. **Ranking multi-experiencia**: Kick and Match calcula su propio puntaje
-   interno (máximo 100). El promedio con Catálogo (tratando la no jugada
-   como 0) vive en las vistas `ranking_by_experience`/`ranking_combined` de
-   Supabase, no en este repo.
-5. **`fetchRanking` (Top 10)**: apunta a `ranking_by_experience` filtrando por
-   `country`/`experience`, pero las columnas reales de esa vista (y si trae
-   algún nombre para mostrar — `participations` solo guarda el email como
-   `participant_id`, no un nombre) todavía no están confirmadas contra el
-   esquema real. Verificar antes de confiar en el Top 10 en producción.
-
-## Decisiones registradas durante el desarrollo (Fase 0)
-
-- `PAIRS_COUNT = 10` (el Figma era contradictorio: el texto de Instructivo
-  decía "las 6", la anotación del canvas decía "8 productos", y había dos
-  tableros mockeados distintos — 4×5 y 3×4). Se resolvió a favor del tablero
-  4×5 (10 pares).
-- Fuente de display/botones: Poppins (el Figma alternaba entre Poppins,
-  Proxima Nova y Montserrat según la pantalla).
-- Radio de `IdInput`: 16px (el Figma alternaba entre 16px y 4px según la
-  pantalla).
-- Puntaje: +10 por acierto, −5 por error, piso en 0, máximo 100. Timer total
-  de partida: 90s: al llegar a 0 la partida termina con el puntaje
-  acumulado hasta ese momento, sin importar pares pendientes.
+- El diseño trae los íconos de **correo** y **celular** intercambiados; cada campo lleva el que le corresponde.
+- El unicornio de la carta (Figma lo estira a 96×165) conserva su proporción.
+- El diseño muestra "Intentos: 11" y "1:05 TIME" como ejemplos; son valores reales de la partida.

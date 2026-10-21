@@ -27,9 +27,9 @@ interface FlowContextValue {
   result: GameResult | null;
   /** Move to a new screen. */
   navigate: (screen: Screen) => void;
-  /** Merge partial participant data (name/email/id) into the current session. */
+  /** Merge partial participant data (id/name) into the current session. */
   setSession: (session: Partial<Session>) => void;
-  /** Records the finished game's outcome, read by Result to submit the participation. */
+  /** Records the finished game's outcome, read by Result. */
   setResult: (result: GameResult) => void;
   /** Return to Welcome and clear all session/flow state (idle timeout, kiosk reset). */
   reset: () => void;

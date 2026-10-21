@@ -1,22 +1,11 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import logoMark from "../../assets/images/logo-mark.svg";
-import type { CardRect, Product } from "../../game/products";
-import styles from "./Card.module.css";
-
-/** Converts a product's logoRect/photoRect (% of the card box) into inline positioning. */
-function rectStyle(rect: CardRect): CSSProperties {
-  return {
-    left: `${rect.left}%`,
-    top: `${rect.top}%`,
-    width: `${rect.width}%`,
-    height: `${rect.height}%`,
-  };
-}
+import { img } from "../../assets";
+import type { Pair } from "../../game/pairs";
 
 interface CardProps {
   isFlipped: boolean;
   isMatched: boolean;
-  product: Product | undefined;
+  pair: Pair | undefined;
   onTap: () => void;
   /** Stagger for the intro drop-in animation; 0 outside the intro (mount only, never replayed). */
   dropDelayMs?: number;
@@ -37,17 +26,7 @@ function pseudoRandom(seed: number): number {
 }
 
 /** One board tile: flips with transform/backface-visibility only (no layout-affecting animation). */
-export function Card({
-  isFlipped,
-  isMatched,
-  product,
-  onTap,
-  dropDelayMs = 0,
-  disabled = false,
-  seed = 0,
-  breathe = false,
-  shaking = false,
-}: CardProps) {
+export function Card({ isFlipped, isMatched, pair, onTap, dropDelayMs = 0, disabled = false, seed = 0, breathe = false, shaking = false }: CardProps) {
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -60,7 +39,7 @@ export function Card({
   return (
     <button
       type="button"
-      className={`${styles.outer} ${breathe ? styles.breathing : ""} ${shaking ? styles.shaking : ""}`}
+      className={`card ${breathe ? "card--breathing" : ""} ${shaking ? "card--shaking" : ""}`}
       style={
         {
           "--drop-delay": `${dropDelayMs}ms`,
@@ -70,33 +49,24 @@ export function Card({
       }
       onClick={onTap}
       disabled={disabled || isFlipped || isMatched}
-      aria-label={isFlipped || isMatched ? (product?.name ?? "carta") : "Carta boca abajo"}
+      aria-label={isFlipped || isMatched ? (pair?.name ?? "carta") : "Carta boca abajo"}
     >
       <div
-        className={`${styles.inner} ${isFlipped || isMatched ? styles.flipped : ""} ${isMatched ? styles.matched : ""}`}
+        className={`card__inner ${isFlipped || isMatched ? "card__inner--flipped" : ""}`}
         data-animating={isAnimating}
         onTransitionEnd={() => setIsAnimating(false)}
       >
-        <div className={`${styles.face} ${styles.faceDown}`}>
-          <img className={styles.faceDownIcon} src={logoMark} alt="" aria-hidden="true" />
+        <div className="card__face card__face--down">
+          <img src={img("card-m-back.svg")} alt="" aria-hidden="true" style={{ left: 40, top: 41, width: 130, height: 118 }} />
         </div>
-        <div className={`${styles.face} ${styles.faceUp}`}>
-          {product && (
-            <>
-              <img
-                className={styles.productLogo}
-                style={rectStyle(product.logoRect)}
-                src={product.logo}
-                alt={product.name}
-              />
-              <img
-                className={styles.productImage}
-                style={rectStyle(product.photoRect)}
-                src={product.image}
-                alt=""
-                aria-hidden="true"
-              />
-            </>
+        <div className="card__face card__face--up" style={{ background: pair?.background }}>
+          {pair && (
+            <img
+              src={img(pair.art.img)}
+              alt=""
+              aria-hidden="true"
+              style={{ left: pair.art.left, top: pair.art.top, width: pair.art.width, height: pair.art.height }}
+            />
           )}
         </div>
       </div>

@@ -1,1 +1,0 @@
-export { BrandFrame } from "./BrandFrame";

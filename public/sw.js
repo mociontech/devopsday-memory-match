@@ -13,7 +13,7 @@
  *   deploy nuevo sirve rutas nuevas solas; cachearlos aca solo arriesgaria
  *   servir una version vieja de la app.
  */
-const CACHE_NAME = "mirage-memory-match-assets-v1";
+const CACHE_NAME = "devopsday-memory-match-assets-v1";
 const CACHEABLE_EXTENSIONS = /\.(png|jpe?g|webp|gif|svg|ttf|woff2?|mp4)$/i;
 
 self.addEventListener("install", (event) => {

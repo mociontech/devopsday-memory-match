@@ -1,19 +1,20 @@
 import { useEffect } from "react";
 import { FlowProvider, useFlow } from "./FlowMachine";
+import { preloadAssets } from "../assets";
+import { Stage } from "../components/Stage";
+import { SecretResetZone } from "../components/SecretResetZone";
+import { IDLE_TIMEOUT_MS } from "../game/game.config";
+import { PAIRS } from "../game/pairs";
 import { useIdleReset } from "../hooks/useIdleReset";
-import { preloadProductAssets } from "../game/products";
-import { initOutboxFlush } from "../services/outbox";
-import { Welcome } from "../screens/Welcome";
-import { Register } from "../screens/Register";
-import { RegisterId } from "../screens/RegisterId";
+import { Game } from "../screens/Game";
 import { IdGenerated } from "../screens/IdGenerated";
 import { Instructions } from "../screens/Instructions";
-import { Game } from "../screens/Game";
-import { Felicidades } from "../screens/Felicidades";
+import { Register } from "../screens/Register";
+import { RegisterId } from "../screens/RegisterId";
 import { Result } from "../screens/Result";
-import { Ranking } from "../screens/Ranking";
-import { SecretResetZone } from "../components/SecretResetZone";
-import styles from "./App.module.css";
+import { Welcome } from "../screens/Welcome";
+import { iniciarEnvioEvius } from "../services/evius";
+import { initOutboxFlush } from "../services/outbox";
 
 /**
  * Blocks the two gestures CSS alone can't stop on a public kiosk: the
@@ -41,7 +42,7 @@ function useKioskGestureLock(): void {
 }
 
 function CurrentScreen() {
-  const { screen } = useFlow();
+  const { screen, session } = useFlow();
   switch (screen) {
     case "welcome":
       return <Welcome />;
@@ -52,32 +53,28 @@ function CurrentScreen() {
     case "idGenerated":
       return <IdGenerated />;
     case "instructions":
-      return <Instructions />;
+      return session.id ? <Instructions /> : <Welcome />;
     case "game":
-      return <Game />;
-    case "felicidades":
-      return <Felicidades />;
+      return session.id ? <Game /> : <Welcome />;
     case "result":
       return <Result />;
-    case "ranking":
-      return <Ranking />;
   }
 }
 
 function AppShell() {
   const { reset } = useFlow();
-  useIdleReset(reset);
+  useIdleReset(reset, IDLE_TIMEOUT_MS);
   useKioskGestureLock();
   useEffect(() => initOutboxFlush(), []);
-  // Arranca en el mismo instante que Welcome (no espera a llegar a Game) -
-  // ver el comentario en game/products.ts#preloadProductAssets.
-  useEffect(() => preloadProductAssets(), []);
+  useEffect(() => iniciarEnvioEvius(), []);
+  // Arranca en el mismo instante que Welcome (no espera a llegar a Game): así el primer volteo de cada carta no espera a la red.
+  useEffect(() => preloadAssets(["card-m-back.svg", ...PAIRS.map((p) => p.art.img)]), []);
 
   return (
-    <div className={styles.shell}>
+    <Stage>
       <CurrentScreen />
       <SecretResetZone onTrigger={reset} />
-    </div>
+    </Stage>
   );
 }
 

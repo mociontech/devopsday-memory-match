@@ -1,59 +1,29 @@
 /**
  * The kiosk flow is linear and closed (no browser back button, no manipulable
  * URLs), so screens are modeled as a state machine instead of routes.
- * "Advertencia" (ID already used) is intentionally NOT a screen here — it is
- * a modal rendered on top of RegisterId, since the design shows it as an
- * overlay with no exit into the game, not a navigable destination.
+ * Los avisos ("ya participaste", "no encontramos ese código") NO son pantallas:
+ * son un modal sobre la pantalla desde la que se dispararon, como en el diseño.
+ *
+ *   welcome → register → idGenerated → instructions → game → result → welcome
+ *   register → "digitar ID código" → registerId → instructions (acceso rápido)
  */
-export type Screen =
-  | "welcome"
-  | "register"
-  | "registerId"
-  | "idGenerated"
-  | "instructions"
-  | "game"
-  | "felicidades"
-  | "result"
-  | "ranking";
+export type Screen = "welcome" | "register" | "registerId" | "idGenerated" | "instructions" | "game" | "result";
 
-/**
- * Participant data collected across Register/RegisterId, plus the game
- * result once played. This is the working draft of a Participation
- * (see types/participation.ts) — Fase 5 reads it to build the final payload.
- */
+/** La persona de esta sesión: el ID lo genera el servidor y es el mismo en todas las experiencias. */
 export interface Session {
   id: string;
   name: string;
-  email: string;
-  score: number;
-  attempts: number;
-  matchedProducts: string[];
-  /** ISO 8601, set when the Game screen mounts. */
-  startedAt: string;
-  /** ISO 8601, set when the game ends (match complete or time out). */
-  finishedAt: string;
 }
 
-export const EMPTY_SESSION: Session = {
-  id: "",
-  name: "",
-  email: "",
-  score: 0,
-  attempts: 0,
-  matchedProducts: [],
-  startedAt: "",
-  finishedAt: "",
-};
+export const EMPTY_SESSION: Session = { id: "", name: "" };
 
-/** Outcome of the game itself, set once the board finishes and read by Result to submit. */
+/** Outcome of the game itself, set once the board finishes and read by Result. */
 export interface GameResult {
-  points: number;
+  /** 0-100 (sin redondear). */
+  score: number;
   attempts: number;
-  matchedProducts: string[];
-  /** ISO 8601 */
-  startedAt: string;
-  /** ISO 8601 */
-  finishedAt: string;
+  matchedPairs: number;
+  durationMs: number;
 }
 
 export interface FlowState {

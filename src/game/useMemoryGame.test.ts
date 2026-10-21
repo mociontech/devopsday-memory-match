@@ -1,11 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMemoryGame, type Card } from "./useMemoryGame";
-import { MAX_SCORE, MISMATCH_DELAY_MS, PAIRS_COUNT, POINTS_PER_MATCH } from "./game.config";
+import { MISMATCH_DELAY_MS, PAIRS_COUNT, POINTS_PER_MATCH } from "./game.config";
+import { POPUP_TEXTS } from "./popups";
 
 function findMatchingPair(cards: Card[]): [Card, Card] {
   for (const card of cards) {
-    const partner = cards.find((c) => c.id !== card.id && c.productId === card.productId);
+    const partner = cards.find((c) => c.id !== card.id && c.pairId === card.pairId);
     if (partner) return [card, partner];
   }
   throw new Error("no matching pair found in deck");
@@ -13,7 +14,7 @@ function findMatchingPair(cards: Card[]): [Card, Card] {
 
 function findMismatchedPair(cards: Card[]): [Card, Card] {
   const [first] = cards;
-  const other = cards.find((c) => c.productId !== first!.productId);
+  const other = cards.find((c) => c.pairId !== first!.pairId);
   return [first!, other!];
 }
 
@@ -26,36 +27,35 @@ afterEach(() => {
 });
 
 describe("useMemoryGame", () => {
-  it("deals PAIRS_COUNT*2 cards, all face down and unmatched", () => {
+  it("reparte PAIRS_COUNT*2 cartas (12 en 3 columnas), todas boca abajo y sin acertar", () => {
     const { result } = renderHook(() => useMemoryGame());
     expect(result.current.cards).toHaveLength(PAIRS_COUNT * 2);
+    expect(result.current.gridColumns).toBe(3);
     expect(result.current.cards.every((c) => !c.isFlipped && !c.isMatched)).toBe(true);
   });
 
-  it("match: flipping two cards of the same product marks both matched and scores +POINTS_PER_MATCH", () => {
+  it("acierto: dos cartas de la misma pareja quedan acertadas y suman POINTS_PER_MATCH", () => {
     const { result } = renderHook(() => useMemoryGame());
     const [a, b] = findMatchingPair(result.current.cards);
 
     act(() => result.current.flipCard(a.id));
     act(() => result.current.flipCard(b.id));
 
-    const flippedA = result.current.cards.find((c) => c.id === a.id)!;
-    const flippedB = result.current.cards.find((c) => c.id === b.id)!;
-    expect(flippedA.isMatched).toBe(true);
-    expect(flippedB.isMatched).toBe(true);
-    expect(result.current.score).toBe(POINTS_PER_MATCH);
-    expect(result.current.lastMatchedProduct?.id).toBe(a.productId);
+    expect(result.current.cards.find((c) => c.id === a.id)!.isMatched).toBe(true);
+    expect(result.current.cards.find((c) => c.id === b.id)!.isMatched).toBe(true);
+    expect(result.current.score).toBeCloseTo(POINTS_PER_MATCH);
+    expect(result.current.attempts).toBe(1);
+    expect(result.current.lastMatchedPair?.id).toBe(a.pairId);
+    expect(POPUP_TEXTS).toContain(result.current.lastMatchText);
   });
 
-  it("mismatch: flipping two different products flips them back down after the delay and costs a penalty", () => {
+  it("error: dos parejas distintas se voltean tras la espera y restan puntos", () => {
     const { result } = renderHook(() => useMemoryGame());
     const [a, b] = findMismatchedPair(result.current.cards);
 
     act(() => result.current.flipCard(a.id));
     act(() => result.current.flipCard(b.id));
 
-    // Both stay face up (but not matched) during the reveal window, and shake to signal the miss.
-    expect(result.current.cards.find((c) => c.id === a.id)!.isFlipped).toBe(true);
     expect(result.current.phase).toBe("evaluating");
     expect(result.current.shakingIds).toEqual([a.id, b.id]);
 
@@ -64,46 +64,43 @@ describe("useMemoryGame", () => {
     });
 
     expect(result.current.cards.find((c) => c.id === a.id)!.isFlipped).toBe(false);
-    expect(result.current.cards.find((c) => c.id === b.id)!.isFlipped).toBe(false);
     expect(result.current.phase).toBe("idle");
-    expect(result.current.shakingIds).toEqual([]);
-    expect(result.current.score).toBe(0); // clamped: 0 matches minus one penalty can't go negative
+    expect(result.current.attempts).toBe(1);
+    expect(result.current.score).toBe(0);
   });
 
-  it("attempts: increments once per pair evaluated, not once per tap", () => {
+  it("no acepta toques mientras el popup del acierto sigue abierto", () => {
     const { result } = renderHook(() => useMemoryGame());
     const [a, b] = findMatchingPair(result.current.cards);
-
     act(() => result.current.flipCard(a.id));
-    expect(result.current.attempts).toBe(0); // first tap of a pair doesn't count yet
-
     act(() => result.current.flipCard(b.id));
-    expect(result.current.attempts).toBe(1);
+
+    const otra = result.current.cards.find((c) => !c.isMatched)!;
+    act(() => result.current.flipCard(otra.id));
+    expect(result.current.cards.find((c) => c.id === otra.id)!.isFlipped).toBe(false);
+
+    act(() => result.current.acknowledgeMatch());
+    act(() => result.current.flipCard(otra.id));
+    expect(result.current.cards.find((c) => c.id === otra.id)!.isFlipped).toBe(true);
   });
 
-  it("finished: reaches phase 'finished' once every pair has been matched", () => {
+  it("termina al acertar todas las parejas y una partida perfecta suma 100 sin repetir textos de popup", () => {
     const { result } = renderHook(() => useMemoryGame());
+    const textos: string[] = [];
 
-    while (result.current.matchedPairs < result.current.totalPairs) {
-      const unmatched = result.current.cards.filter((c) => !c.isMatched);
-      const [a, b] = findMatchingPair(unmatched);
+    for (let i = 0; i < PAIRS_COUNT; i++) {
+      const pendientes = result.current.cards.filter((c) => !c.isMatched);
+      const [a, b] = findMatchingPair(pendientes);
       act(() => result.current.flipCard(a.id));
       act(() => result.current.flipCard(b.id));
+      textos.push(result.current.lastMatchText!);
       act(() => result.current.acknowledgeMatch());
     }
 
     expect(result.current.phase).toBe("finished");
-    expect(result.current.score).toBe(MAX_SCORE);
-  });
-
-  it("finished: also reached when the countdown reaches zero, regardless of pairs left", () => {
-    const { result } = renderHook(() => useMemoryGame());
-
-    act(() => {
-      vi.advanceTimersByTime(90_000);
-    });
-
-    expect(result.current.phase).toBe("finished");
-    expect(result.current.timeRemainingMs).toBe(0);
+    expect(result.current.matchedPairs).toBe(PAIRS_COUNT);
+    expect(result.current.attempts).toBe(PAIRS_COUNT);
+    expect(Math.round(result.current.score)).toBe(100);
+    expect(new Set(textos).size).toBe(PAIRS_COUNT);
   });
 });

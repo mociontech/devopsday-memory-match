@@ -1,271 +1,110 @@
-import { normalizeEmail } from "./idService";
-import type { Participation } from "../types/participation";
+import { EXPERIENCE, env } from "../config/env";
 
 /**
- * The single outbound interface the rest of the app talks to — outbox.ts
- * retries whatever this throws on, screens never call fetch directly.
+ * Única salida de red de la app hacia la base de datos compartida (DevOps Days Bogotá 2026).
+ * Un ID por persona (321-321), generado en el servidor y válido en todas las experiencias.
  *
- * Fans out to Evius (attendee + experience result, shared with "Mirage
- * Colombia/Mexico" per-country events) and to the shared Supabase ranking
- * store (same project as the Catalogo experience, table `participations`,
- * deduped by participant_id + country + experience).
+ *   guardar(datos)              → { id, nombre }               POST /registrar
+ *   buscarPorId(id)             → { id, nombre, jugado } | null GET  /participante/:id
+ *   guardarResultado(resultado) → { guardado }                 POST /participacion
  */
-const COUNTRY = import.meta.env.VITE_COUNTRY;
-const EXPERIENCE_NAME = import.meta.env.VITE_EXPERIENCE_NAME || "Mirage - Memory Match";
 
-const EVIUS_URL = import.meta.env.VITE_EVIUS_URL;
-const EVIUS_TOKEN = import.meta.env.VITE_EVIUS_TOKEN;
-const EVIUS_EVENT_ID = import.meta.env.VITE_EVIUS_EVENT_ID;
-const EVIUS_EXPERIENCE_ID = import.meta.env.VITE_EVIUS_EXPERIENCE_ID;
+export const MSG_RED = "No hay conexión con el servidor. Revisa internet e inténtalo de nuevo.";
 
-const RANKING_DB_URL = import.meta.env.VITE_RANKING_DB_URL;
-const RANKING_DB_API_KEY = import.meta.env.VITE_RANKING_DB_API_KEY;
-const RANKING_DB_TABLE = import.meta.env.VITE_RANKING_DB_TABLE || "participations";
-
-/**
- * Fecha local (YYYY-MM-DD) de "ahora" en la zona horaria del pais de este
- * despliegue - tiene que dar el mismo valor que el event_day calculado en
- * ranking_by_experience/ranking_combined (ver docs/supabase-schema.sql del
- * proyecto Catalogo). El ranking (y el premio) se maneja por dia: cada dia
- * del evento de una semana arranca en position 1 de nuevo.
- */
-function getEventDay(): string {
-  const timeZone = COUNTRY === "CO" ? "America/Bogota" : "America/Mexico_City";
-  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+export interface Persona {
+  id: string;
+  nombre: string;
 }
 
-export interface RankingEntry {
-  name: string;
-  points: number;
+export interface PersonaConsultada extends Persona {
+  /** Ya terminó una partida de Memory Match: no puede repetir. */
+  jugado: boolean;
 }
 
-async function postEvius(path: string, body: unknown): Promise<Response> {
-  return fetch(`${EVIUS_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${EVIUS_TOKEN}`,
-    },
-    body: JSON.stringify(body),
-  });
+export interface DatosRegistro {
+  nombre: string;
+  celular: string;
+  empresa: string;
+  correo: string;
 }
 
-/** POST /attendees — only if there's an email, deduped by email + eventId. */
-async function submitAttendee(participation: Participation): Promise<void> {
-  if (!participation.email) return;
-  const res = await postEvius("/attendees", {
-    eventId: EVIUS_EVENT_ID,
-    source: EXPERIENCE_NAME,
-    records: [
-      {
-        fullName: participation.name,
-        email: normalizeEmail(participation.email),
-        checkInAt: participation.startedAt,
-        country: COUNTRY,
-      },
-    ],
-  });
-  if (!res.ok) throw new Error(`Evius /attendees failed: ${res.status}`);
+export interface Resultado {
+  id: string;
+  /** 0-100, entero. */
+  puntaje: number;
+  detalles: { intentos: number; duracionMs: number; parejas: number };
 }
 
-/** POST /experiences, falling back to /activities (score embedded as JSON) if that fails. */
-async function submitExperienceResult(participation: Participation): Promise<void> {
-  const record = {
-    email: normalizeEmail(participation.email),
-    play_timestamp: participation.finishedAt,
-    score: participation.points,
-    bonusScore: 0,
-    data: {
-      name: participation.name,
-      code: participation.id,
-      productId: participation.matchedProducts[0] ?? null,
-      idempotencyKey: `memory-match:${COUNTRY}:${participation.id}`,
-    },
-  };
-
-  const res = await postEvius("/experiences", {
-    eventId: EVIUS_EVENT_ID,
-    experienceId: EVIUS_EXPERIENCE_ID,
-    records: [record],
-  });
-  if (res.ok) return;
-
-  // /experiences is unconfirmed in the official Evius API — fall back to
-  // the documented /activities endpoint with the score embedded as JSON.
-  const fallbackRes = await postEvius("/activities", {
-    eventId: EVIUS_EVENT_ID,
-    experienceId: EVIUS_EXPERIENCE_ID,
-    records: [
-      {
-        email: record.email,
-        longDescription: JSON.stringify({
-          score: record.score,
-          bonusScore: record.bonusScore,
-          play_timestamp: record.play_timestamp,
-          ...record.data,
-        }),
-      },
-    ],
-  });
-  if (!fallbackRes.ok) throw new Error(`Evius /experiences and /activities both failed`);
-}
-
-/** POST to the shared Supabase ranking table, deduped by (participant_id, country, experience). */
-async function submitRanking(participation: Participation): Promise<void> {
-  const res = await fetch(`${RANKING_DB_URL}/rest/v1/${RANKING_DB_TABLE}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: RANKING_DB_API_KEY,
-      Authorization: `Bearer ${RANKING_DB_API_KEY}`,
-      // Plain insert, not an upsert: the anon key only has INSERT on this
-      // table (no UPDATE/SELECT), so `resolution=merge-duplicates` would
-      // make Postgres reject every insert with 42501 while planning the
-      // ON CONFLICT DO UPDATE it implies - see docs/supabase-schema.sql in
-      // the Catalogo project for the RLS policies.
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({
-      participant_id: normalizeEmail(participation.email),
-      participant_name: participation.name,
-      country: COUNTRY,
-      experience: "memory_match",
-      score: participation.points,
-      submitted_at: participation.finishedAt,
-    }),
-  });
-  // 409 = el unique constraint (participant_id, country, experience)
-  // rechazando un duplicado real - nunca es transitorio, reintentarlo jamas
-  // va a funcionar. Antes esto lanzaba igual que cualquier otro fallo, y el
-  // outbox lo reintentaba para siempre (persistido en localStorage, revivido
-  // en cada carga de pagina). Se trata como entrega exitosa: la fila que se
-  // queria ya esta ahi.
-  if (res.status === 409) return;
-  if (!res.ok) throw new Error(`Ranking DB submit failed: ${res.status}`);
-}
-
-/**
- * Sends one participation to every destination that has its own env vars
- * configured — Evius and the ranking DB are independent deployments, so one
- * being unset (e.g. Evius credentials not issued yet) must not block the
- * other. Throws if a *configured* destination's request fails; outbox.ts is
- * what decides what to do about that (retry later), this function never
- * swallows a real request failure.
- */
-export async function submitParticipation(participation: Participation): Promise<void> {
-  const tasks: Promise<void>[] = [];
-
-  if (EVIUS_URL && EVIUS_TOKEN && COUNTRY) {
-    tasks.push(submitAttendee(participation), submitExperienceResult(participation));
+export class ErrorApi extends Error {
+  codigo: string;
+  constructor(mensaje: string, codigo = "interno") {
+    super(mensaje);
+    this.codigo = codigo;
   }
-  if (RANKING_DB_URL && RANKING_DB_API_KEY) {
-    tasks.push(submitRanking(participation));
-  }
+}
 
-  if (tasks.length === 0) {
-    throw new Error(
-      "submitParticipation: neither Evius (VITE_EVIUS_URL/VITE_EVIUS_TOKEN/VITE_COUNTRY) nor the ranking DB (VITE_RANKING_DB_URL/VITE_RANKING_DB_API_KEY) are configured",
+/** true si el error es de conexión (vale la pena reintentar); false si el servidor rechazó la solicitud. */
+export const esErrorDeRed = (e: unknown) => e instanceof ErrorApi && (e.codigo === "red" || e.codigo === "interno");
+
+async function pedir<T>(ruta: string, cuerpo?: unknown): Promise<T> {
+  const ctl = new AbortController();
+  const corte = setTimeout(() => ctl.abort(), 12_000);
+  let res: Response;
+  try {
+    // El GET no lleva cabeceras propias: así el navegador se ahorra la petición previa (preflight).
+    res = await fetch(
+      env.apiUrl + ruta,
+      cuerpo === undefined
+        ? { signal: ctl.signal }
+        : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo), signal: ctl.signal },
     );
+  } catch {
+    throw new ErrorApi(MSG_RED, "red");
+  } finally {
+    clearTimeout(corte);
   }
-  await Promise.all(tasks);
+
+  let datos: { mensaje?: string; error?: string } | null = null;
+  try {
+    datos = await res.json();
+  } catch {
+    /* sin cuerpo */
+  }
+  if (!res.ok) {
+    throw new ErrorApi(datos?.mensaje || "No pudimos completar la solicitud. Inténtalo de nuevo.", datos?.error || "interno");
+  }
+  return datos as T;
 }
 
-/**
- * Top 10 for the Ranking screen. Returns an empty list if unconfigured or
- * unreachable — never throws.
- *
- * Reads `ranking_combined` (average of catalogo + memory_match per person,
- * see docs/supabase-schema.sql in the Catalogo project) instead of
- * `ranking_by_experience` filtered to memory_match - it's the ranking that
- * actually decides the prize. Showing the per-experience top 10 here caused
- * a real incident at the Mexico event: someone saw a high score/rank on this
- * experience alone and assumed it meant they'd won.
- */
-export async function fetchRanking(): Promise<RankingEntry[]> {
-  if (!RANKING_DB_URL || !RANKING_DB_API_KEY) return [];
-  try {
-    const query = new URLSearchParams({
-      country: `eq.${COUNTRY}`,
-      event_day: `eq.${getEventDay()}`,
-      order: "position.asc",
-      limit: "10",
-    });
-    const res = await fetch(`${RANKING_DB_URL}/rest/v1/ranking_combined?${query}`, {
-      headers: {
-        apikey: RANKING_DB_API_KEY,
-        Authorization: `Bearer ${RANKING_DB_API_KEY}`,
-      },
-    });
-    if (!res.ok) return [];
-    const rows = (await res.json()) as Array<{
-      participant_id: string;
-      participant_name?: string | null;
-      final_score: number;
-    }>;
-    return rows.map((row) => ({ name: row.participant_name || row.participant_id, points: row.final_score }));
-  } catch {
-    return [];
-  }
-}
+// Si el envío se repite (respuesta perdida) se reutiliza la misma clave y el servidor no duplica.
+let envio: { huella: string; idem: string } | null = null;
 
-/**
- * This participant's rank WITHIN memory_match only (1 = highest score),
- * read straight off `ranking_by_experience`'s own `position` column. Used
- * right after finishing the game to say "en esta experiencia vas en el
- * puesto #N" - explicitly scoped, never presented as the prize-deciding
- * rank (that's fetchMyCombinedPosition below). Returns null if
- * unconfigured/unreachable, or if the row hasn't synced yet (the submission
- * goes through the outbox and can lag a few seconds).
- */
-export async function fetchMyPosition(email: string): Promise<number | null> {
-  if (!RANKING_DB_URL || !RANKING_DB_API_KEY) return null;
-  try {
-    const query = new URLSearchParams({
-      participant_id: `eq.${normalizeEmail(email)}`,
-      country: `eq.${COUNTRY}`,
-      experience: "eq.memory_match",
-      event_day: `eq.${getEventDay()}`,
-      select: "position",
-    });
-    const res = await fetch(`${RANKING_DB_URL}/rest/v1/ranking_by_experience?${query}`, {
-      headers: {
-        apikey: RANKING_DB_API_KEY,
-        Authorization: `Bearer ${RANKING_DB_API_KEY}`,
-      },
-    });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ position: number }>;
-    return rows[0]?.position ?? null;
-  } catch {
-    return null;
-  }
-}
+export const Registros = {
+  async guardar(datos: DatosRegistro): Promise<Persona> {
+    const huella = JSON.stringify(datos);
+    if (!envio || envio.huella !== huella) envio = { huella, idem: crypto.randomUUID() };
+    const r = await pedir<Persona>("/registrar", { ...datos, experiencia: EXPERIENCE, idem: envio.idem });
+    envio = null;
+    return { id: r.id, nombre: r.nombre };
+  },
 
-/**
- * This participant's rank in `ranking_combined` (the one that decides the
- * prize) - shown on Result.tsx alongside (but clearly separate from) the
- * per-experience score/position above, so nobody mistakes one for the
- * other again.
- */
-export async function fetchMyCombinedPosition(email: string): Promise<number | null> {
-  if (!RANKING_DB_URL || !RANKING_DB_API_KEY) return null;
-  try {
-    const query = new URLSearchParams({
-      participant_id: `eq.${normalizeEmail(email)}`,
-      country: `eq.${COUNTRY}`,
-      event_day: `eq.${getEventDay()}`,
-      select: "position",
-    });
-    const res = await fetch(`${RANKING_DB_URL}/rest/v1/ranking_combined?${query}`, {
-      headers: {
-        apikey: RANKING_DB_API_KEY,
-        Authorization: `Bearer ${RANKING_DB_API_KEY}`,
-      },
-    });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ position: number }>;
-    return rows[0]?.position ?? null;
-  } catch {
-    return null;
-  }
-}
+  async buscarPorId(id: string): Promise<PersonaConsultada | null> {
+    try {
+      const r = await pedir<{ id: string; nombre: string; jugado?: boolean }>(
+        `/participante/${encodeURIComponent(id)}?experiencia=${EXPERIENCE}`,
+      );
+      return { id: r.id, nombre: r.nombre, jugado: r.jugado === true };
+    } catch (e) {
+      if (e instanceof ErrorApi && e.codigo === "no_encontrado") return null;
+      throw e;
+    }
+  },
+
+  /** Idempotente en el servidor: solo cuenta la primera vez, así que reintentar es seguro. */
+  async guardarResultado(resultado: Resultado): Promise<void> {
+    await pedir("/participacion", { ...resultado, experiencia: EXPERIENCE });
+  },
+};
+
+/** Convierte cualquier fallo en un mensaje para la persona. */
+export const mensajeDe = (e: unknown) => (e instanceof ErrorApi ? e.message : MSG_RED);

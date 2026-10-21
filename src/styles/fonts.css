@@ -1,67 +1,14 @@
-/**
- * Self-hosted brand font (latin subset, per el no-external-fonts constraint -
- * nada se pide a Google Fonts en runtime). Acumin Pro reemplaza a
- * Poppins/Lora (esas eran solo placeholders mientras no habia tipografia
- * real del cliente) - un solo tipo de letra para heading y body, con el
- * peso resuelto por font-weight en cada estilo, no por familias distintas.
- *
- * "Acumin Variable Concept" es la fuente real que usa Figma (variable, con
- * eje de peso Y de ancho/condensado) - el archivo que el cliente entrego.
- * Declarada con font-weight 100-900 y font-stretch 50%-200% para exponer
- * toda la variable via los ejes estandar de CSS. "Acumin Pro" (los 4 cortes
- * estaticos de abajo) queda como fallback para navegadores viejos sin
- * soporte de variable fonts, o si esta familia no carga por algun motivo.
+/*
+ * Fuentes autohospedadas (paquetes @fontsource, solo subset latino): el kiosko no hace ninguna llamada a
+ * Google Fonts en runtime, así que el primer pintado no depende de la red del venue.
  */
-@font-face {
-  font-family: "Acumin Variable Concept";
-  font-style: normal;
-  font-weight: 100 900;
-  font-stretch: 50% 200%;
-  font-display: swap;
-  src: url("../assets/fonts/AcuminVariableConcept.ttf") format("truetype-variations");
-}
-
-@font-face {
-  font-family: "Acumin Pro";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../assets/fonts/AcuminPro-Regular.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Acumin Pro";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("../assets/fonts/AcuminPro-Medium.ttf") format("truetype");
-}
-
-/* font-weight:700 carga el corte Black (no el Bold estatico, que se ve mas
-   liviano que el diseño) - es el unico peso grueso usado en toda la app. */
-@font-face {
-  font-family: "Acumin Pro";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("../assets/fonts/AcuminPro-Black.ttf") format("truetype");
-}
-
-/* Memory Match usa font-weight:800 en varias pantallas (Badge, Ranking,
-   Result, Modal) - declarado explicito para no depender del algoritmo de
-   fallback del navegador para un peso que no tenemos como corte propio. */
-@font-face {
-  font-family: "Acumin Pro";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("../assets/fonts/AcuminPro-Black.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Acumin Pro";
-  font-style: normal;
-  font-weight: 900;
-  font-display: swap;
-  src: url("../assets/fonts/AcuminPro-Black.ttf") format("truetype");
-}
+@import "@fontsource/montserrat/latin-400.css";
+@import "@fontsource/montserrat/latin-700.css";
+@import "@fontsource/montserrat/latin-800.css";
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-700.css";
+@import "@fontsource/figtree/latin-700.css";
+@import "@fontsource/figtree/latin-800.css";
+@import "@fontsource/poppins/latin-400.css";
+@import "@fontsource/roboto/latin-400.css";
+@import "@fontsource/roboto/latin-700.css";

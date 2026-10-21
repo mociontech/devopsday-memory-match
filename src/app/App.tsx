@@ -13,7 +13,6 @@ import { Register } from "../screens/Register";
 import { RegisterId } from "../screens/RegisterId";
 import { Result } from "../screens/Result";
 import { Welcome } from "../screens/Welcome";
-import { iniciarEnvioEvius } from "../services/evius";
 import { initOutboxFlush } from "../services/outbox";
 
 /**
@@ -66,7 +65,6 @@ function AppShell() {
   useIdleReset(reset, IDLE_TIMEOUT_MS);
   useKioskGestureLock();
   useEffect(() => initOutboxFlush(), []);
-  useEffect(() => iniciarEnvioEvius(), []);
   // Arranca en el mismo instante que Welcome (no espera a llegar a Game): así el primer volteo de cada carta no espera a la red.
   useEffect(() => preloadAssets(["card-m-back.svg", ...PAIRS.map((p) => p.art.img)]), []);
 

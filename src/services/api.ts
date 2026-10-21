@@ -1,4 +1,4 @@
-import { EXPERIENCE, env } from "../config/env";
+import { env } from "../config/env";
 
 /**
  * Única salida de red de la app hacia la base de datos compartida (DevOps Days Bogotá 2026).
@@ -19,8 +19,6 @@ export interface Persona {
 export interface PersonaConsultada extends Persona {
   /** Ya terminó una partida de Memory Match: no puede repetir. */
   jugado: boolean;
-  /** Contacto guardado (solo si aún no completó esta experiencia): sirve para registrarla en Evius. */
-  contacto?: { correo?: string; celular?: string; empresa?: string };
 }
 
 export interface DatosRegistro {
@@ -85,18 +83,15 @@ export const Registros = {
   async guardar(datos: DatosRegistro): Promise<Persona> {
     const huella = JSON.stringify(datos);
     if (!envio || envio.huella !== huella) envio = { huella, idem: crypto.randomUUID() };
-    const r = await pedir<Persona>("/registrar", { ...datos, experiencia: EXPERIENCE, idem: envio.idem });
+    const r = await pedir<Persona>("/registrar", { ...datos, idem: envio.idem });
     envio = null;
     return { id: r.id, nombre: r.nombre };
   },
 
   async buscarPorId(id: string): Promise<PersonaConsultada | null> {
     try {
-      const r = await pedir<{ id: string; nombre: string; jugado?: boolean; correo?: string; celular?: string; empresa?: string }>(
-        `/participante/${encodeURIComponent(id)}?experiencia=${EXPERIENCE}`,
-      );
-      const contacto = r.correo ? { correo: r.correo, celular: r.celular, empresa: r.empresa } : undefined;
-      return { id: r.id, nombre: r.nombre, jugado: r.jugado === true, contacto };
+      const r = await pedir<{ id: string; nombre: string; jugado?: boolean }>(`/participante/${encodeURIComponent(id)}`);
+      return { id: r.id, nombre: r.nombre, jugado: r.jugado === true };
     } catch (e) {
       if (e instanceof ErrorApi && e.codigo === "no_encontrado") return null;
       throw e;
@@ -105,7 +100,7 @@ export const Registros = {
 
   /** Idempotente en el servidor: solo cuenta la primera vez, así que reintentar es seguro. */
   async guardarResultado(resultado: Resultado): Promise<void> {
-    await pedir("/participacion", { ...resultado, experiencia: EXPERIENCE });
+    await pedir("/participacion", resultado);
   },
 };
 

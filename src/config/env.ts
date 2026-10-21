@@ -1,7 +1,7 @@
 /**
  * Configuración del despliegue. Solo las variables con prefijo VITE_ llegan al navegador, así que aquí no
- * puede haber claves ni tokens: Evius y la base de datos se hablan únicamente desde la función de servidor
- * (ver ../backend), nunca desde el kiosko.
+ * puede haber claves ni tokens: Evius y la base de datos se hablan únicamente desde el servidor
+ * de este proyecto (carpeta server/), nunca desde el navegador.
  */
 
 function readOptional(key: string): string | undefined {
@@ -10,9 +10,8 @@ function readOptional(key: string): string | undefined {
 }
 
 export const env = {
-  apiUrl: readOptional("VITE_API_URL") ?? "https://jvhxghykvifkggekcdvi.supabase.co/functions/v1/api",
+  /** El servidor de este proyecto (función de Netlify o middleware de Vite) responde en el mismo origen. */
+  apiUrl: "/api",
   kioskId: readOptional("VITE_KIOSK_ID") ?? "unknown",
 };
 
-/** Clave de esta experiencia en la base de datos compartida. */
-export const EXPERIENCE = "memory" as const;

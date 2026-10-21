@@ -4,7 +4,6 @@ import { img } from "../assets";
 import { Blobs, TopBar, Wordmark } from "../components/Brand";
 import { Button } from "../components/Button";
 import { Warning } from "../components/Popup";
-import { enviarEvius, recordarContacto } from "../services/evius";
 import { ErrorApi, Registros, mensajeDe } from "../services/api";
 
 type Campo = "nombre" | "empresa" | "correo" | "celular";
@@ -65,16 +64,10 @@ export function Register() {
         correo: valores.correo.trim(),
         celular: valores.celular,
       });
-      // Supabase ya confirmó el registro: lo mismo va a Evius en segundo plano (con cola y reintentos).
-      // La partida se envía a Evius al terminar (Result), con su puntaje.
-      const contacto = { email: valores.correo.trim(), fullName: valores.nombre.trim(), phone: valores.celular, company: valores.empresa.trim() };
-      recordarContacto(persona.id, contacto);
-      enviarEvius(contacto);
       setSession({ id: persona.id, name: persona.nombre });
       navigate("idGenerated");
     } catch (err) {
-      if (err instanceof ErrorApi && err.codigo === "correo_duplicado") {
-        setInvalidos(["correo"]);
+      if (err instanceof ErrorApi && err.codigo === "ya_participo") {
         setAviso(err.message);
       } else {
         setError(mensajeDe(err));

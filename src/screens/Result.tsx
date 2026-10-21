@@ -5,7 +5,6 @@ import { Rings, SocialFooter, SoftBackground, TopBar, Wordmark } from "../compon
 import { Button } from "../components/Button";
 import { PAIRS_COUNT } from "../game/game.config";
 import { toDbScore } from "../game/scoring";
-import { contactoDe, enviarEvius } from "../services/evius";
 import { enqueueResultado } from "../services/outbox";
 
 /** 65000 ms → "1:05". */
@@ -30,11 +29,7 @@ export function Result() {
       puntaje: toDbScore(result.score),
       detalles: { intentos: result.attempts, duracionMs: result.durationMs, parejas: PAIRS_COUNT },
     });
-    // A Evius, en paralelo y en segundo plano. El contacto viene del registro (o se rescató de la base al entrar con ID).
-    const contacto = contactoDe(session.id);
-    if (contacto) {
-      enviarEvius(contacto, { score: toDbScore(result.score), attempts: result.attempts, durationMs: result.durationMs });
-    }
+    // El servidor guarda el resultado en la base y lo manda a Evius (con reintentos): aquí no hace falta nada más.
   }, [result, session.id]);
 
   return (

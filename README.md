@@ -7,7 +7,7 @@ Reemplaza el diseño de Mirage ("Kick and Match"): el código anterior sigue en 
 
 | Comando | Qué hace |
 |---|---|
-| `npm run dev` | Servidor de desarrollo en http://127.0.0.1:5504 (puerto fijo: coincide con `ALLOWED_ORIGINS` de la API) |
+| `npm run dev` | Servidor de desarrollo en http://127.0.0.1:5504 (puerto fijo; sirve también `/api/*`) |
 | `npm run build` | `tsc` (type-check estricto) + build de producción |
 | `npm run preview` | Sirve el build de `dist/` |
 | `npm run test` | Vitest (puntaje y lógica del tablero) |
@@ -33,33 +33,34 @@ welcome → register → idGenerated → instructions → game → result → we
   Se redondea a entero (`game/scoring.ts`). _Pendiente de confirmar con quien defina el ranking._
 - Al acertar una pareja aparece un popup con uno de los 12 textos del diseño (`game/popups.ts`), sin repetir en la partida.
 
-## Datos y servidor
+## Servidor propio (`server/`)
 
-La base de datos se habla a través de la función de servidor del proyecto (`../backend`). **Evius se envía directo desde
-la app** (`services/evius.ts`), en paralelo y en segundo plano, con las variables `VITE_EVIUS_*`: el token queda en el
-código del navegador. Solo se envía si la persona se registró en este equipo (el acceso rápido no devuelve el correo).
+Este proyecto es **autónomo**: trae su propio servidor y sus propias variables de entorno. Lo único compartido con las
+otras experiencias es la **base de datos** (Supabase, mismas tablas); el código no se comparte, se replica.
 
-| Acción | Llamada |
-|---|---|
-| Registro | `POST /registrar` |
-| Acceso rápido | `GET /participante/:id?experiencia=memory` |
-| Resultado de la partida | `POST /participacion` (idempotente: solo cuenta la primera vez) |
+- `server/registros.ts`: todo el acceso a datos (base + Evius). La experiencia (`memory`) es la única línea que cambia entre proyectos.
+- `server/handler.ts`: la API (`POST /api/registrar`, `GET /api/participante/:id`, `POST /api/participacion`).
+- El navegador solo habla con `/api/*` del mismo origen; **las claves nunca llegan al navegador**.
+- El ID (`321-321`) lo genera la base. Un correo ya registrado devuelve el ID de esa persona (no se duplica).
+- El acceso rápido devuelve solo el nombre. El servidor lee el contacto de la base y registra a la persona en Evius
+  (`/attendees` y luego `/experiences`); si Evius falla, queda pendiente en la base y se reintenta con espera creciente.
+- El resultado (`puntaje`, intentos, duración) lo guarda el servidor la primera vez; `services/outbox.ts` lo guarda en
+  `localStorage` **antes** de depender de la red y lo reintenta en segundo plano (1s/2s/4s/8s, al volver la conexión y cada 20 s).
+  A Evius sale solo cuando ya hay resultado.
 
-`services/outbox.ts` guarda el resultado en `localStorage` **antes** de depender de la red y lo reintenta en
-segundo plano (1s/2s/4s/8s, al volver la conexión y cada 20 s), así que nadie queda bloqueado por un mal wifi.
-
-**Requiere la migración `backend/supabase/migrations/20261021_003_memory_match.sql`** (agrega la experiencia
-`memory`, la marca de "ya jugó" y el guardado del resultado). Sin ella, el registro y el resultado fallan.
-
-## Variables de entorno (`.env`)
-
-Solo `VITE_*` llega al navegador. Ver `.env.example`.
+Variables (`.env` local o panel del hosting; ver `.env.example`):
 
 | Variable | Para qué |
 |---|---|
-| `VITE_API_URL` | URL de la función `api`. Tiene valor por defecto en `config/env.ts`. |
-| `VITE_KIOSK_ID` | Identificador del tótem (diagnóstico). |
-| `VITE_EVIUS_URL`, `VITE_EVIUS_TOKEN`, `VITE_EVIUS_EVENT_ID`, `VITE_EVIUS_EXPERIENCE_ID`, `VITE_EVIUS_SOURCE` | Evius (Datahub). Sin ellas el envío a Evius queda apagado. En Netlify, cargarlas como variables del sitio. |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Base compartida. La clave de servicio (secret key) va **solo** en el servidor. |
+| `EVIUS_MODE` | `live` activa el envío a Evius; con cualquier otro valor no se manda nada. |
+| `EVIUS_URL`, `EVIUS_TOKEN`, `EVIUS_EVENT_ID`, `EVIUS_EXPERIENCE_ID`, `EVIUS_SOURCE` | Evius (Datahub). |
+
+**Requiere** que la migración `backend/supabase/migrations/20261021_003_autonomo.sql` esté aplicada en Supabase.
+
+**Despliegue en Netlify:** `netlify.toml` ya define el build; `netlify/functions/api.mts` sirve `/api/*` y
+`netlify/functions/reintentar.mts` reintenta lo pendiente hacia Evius cada minuto. Carga las variables de la tabla en
+*Site configuration → Environment variables*.
 
 ## Tipografía y recursos
 
